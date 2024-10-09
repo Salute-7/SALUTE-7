@@ -1,1 +1,1 @@
-Бот создан sharp (tmmorg) (tg)
+Бот создан sharp (tmmorg) (tg).
