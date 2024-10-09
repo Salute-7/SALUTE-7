@@ -1,0 +1,37 @@
+{
+
+    "ICON_DOLG": "<:Dolg:1279804149076070400>",  
+    "ICON_ADMIN": "<:Personal:1279818181334274169>",
+    "ICON_MODER": "<:Personal:1279818181334274169>",
+    "ICON_OSNOVA": "<:Personal:1279818181334274169>",
+    "ICON_POLZOV": "<:User:1279806689847017563>",
+    "ICON_CREATE": "<:Created:1279806426285609071>",
+    "ICON_BLOCKED": "<:banned:1280552613716168767>",   
+    "ICON_ZAMOROZKA": "<:Zamorozka:1279804988897366199>",
+    "ICON_PERMISSION": "<:permission_icon:1279589753506893835>",
+
+    "ADMINI": "<:Admin:1279826601634431038>",
+    "APPROVED": "<:approved:1279797619358437459>",
+    "MODERI": "<:Moderator:1280554762475016275>",    
+    "OSNOVA": "<:Osnovatel:1279826856639594548>",
+    "LOGI": "<:logi:1280927181341720666>",    
+    "LOGI_2": "<:zaymi:1280928438135291945>",
+    "LOGI_3": "<:pays:1280927161196482622>",
+    "SERVER": "<:Server:1280926447179137044>",
+    "SERVER_2": "<:Palitra_ne_oskorblenie:1280919927057944718>",
+    "SERVER_3": "",
+    "SERVERS": "<:severs:1280528071144767539>",
+    "NEW_ROLE": "<:new_role:1282427855225229472>",  
+    "REASON": "<:banned:1280552613716168767>",  
+
+    "DOBRO": "<:odobreno:1280268174650249320>",
+    "OTKAZ": "<:otkazano:1280268327259996235>",
+    "DYMAU": "<:rassmotrenie:1280268271756509320>",
+
+    "UPDATE": "17.09.24",
+    "RAZRAB": "[Sharp](https://discord.com/users/936292219378348033)",
+    "VERSION": "1.6.5",
+    "TOKEN": "MTIyMzU5MTg4NjEyODkzOTA5MA.GgKGVn.ViNlRVRx5U7sxsdPnF2rwFJb89RRTbvFnkv0K4",
+    "TOKEN2": "MTI4MjQwMDEwNTAyMTk2ODM4NA.GznsQq.-tjyjVcDjw87BeqDGZHT2MTSqpCl_AZDDLL2sc"
+
+}

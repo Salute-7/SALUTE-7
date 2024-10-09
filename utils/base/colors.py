@@ -1,0 +1,27 @@
+import disnake
+from disnake.ext import commands
+colors = {
+    "orange": disnake.Color.orange(),
+    "red": disnake.Color.red(),
+    "green": disnake.Color.green(),
+    "blue": disnake.Color.blue(),
+    "purple": disnake.Color.purple(),
+    "yellow": disnake.Color.gold(),
+    "orange": disnake.Color.orange(),
+    "red": disnake.Color.red(),
+    "green": disnake.Color.green(),
+    "blue": disnake.Color.blue(),
+    "purple": disnake.Color.purple(),
+    "yellow": disnake.Color.gold(),
+    "pink": disnake.Color.from_rgb(255, 105, 180),
+    "cyan": disnake.Color.from_rgb(0, 255, 255),
+    "lime": disnake.Color.from_rgb(50, 205, 50),
+    "brown": disnake.Color.from_rgb(139, 69, 19),
+    "grey": disnake.Color.from_rgb(128, 128, 128),
+    "navy": disnake.Color.from_rgb(0, 0, 128),
+    "teal": disnake.Color.from_rgb(0, 128, 128),
+    "gold": disnake.Color.from_rgb(255, 215, 0),
+    "salmon": disnake.Color.from_rgb(250, 128, 114),
+    "orchid": disnake.Color.from_rgb(218, 112, 214),
+    "black": disnake.Color.from_rgb(0, 0, 0),
+}
