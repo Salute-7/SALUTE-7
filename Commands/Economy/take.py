@@ -8,7 +8,7 @@ from disnake.ext import commands
 bot = commands.InteractionBot(intents=disnake.Intents.all())
 
 def load_base():
-    config_path = os.path.join('utils/cache/configs', f'main.json')
+    config_path = os.path.join('utils/global', f'main.json')
     if os.path.exists(config_path):
         with open(config_path, 'r') as config_file:
             return json.load(config_file)
@@ -30,28 +30,44 @@ def create_embed(title, description, color):
     return embed
 
 def get_color_from_config(settings):
-    color_choice = settings.get('COLOR', 'orange')
+    color_choice = settings.get('COLOR', 'default')
     return colors.get(color_choice.lower(), disnake.Color.orange())
+
+def load_admin_users():
+    try:
+        with open('utils/global/admin_users.json', 'r', encoding='utf-8') as f:
+            admin_users = json.load(f)
+            return admin_users
+    except FileNotFoundError:
+        return {}
 
 async def check_permissions(guild_id, ctx):
     settings = load_config(guild_id)
     chosen_color = get_color_from_config(settings)
 
-    def get_role_ids(role_key):
-        return [
-            int(role_id) for role_id in settings.get(role_key, [])
-            if isinstance(role_id, (str, int)) and str(role_id).strip()
-        ]
+    admin_users = load_admin_users()
     
-    ROLE_IDS_MODERATOR = get_role_ids('ROLE_MODER')
-    ROLE_IDS_ADMIN = get_role_ids('ROLE_ADMIN')
+    ROLE_IDS_MODERATOR = []
+    for role_id in settings['ROLE_MODER'].split(','):
+        try:
+            ROLE_IDS_MODERATOR.append(int(role_id.strip()))
+        except ValueError:
+            pass
+    ROLE_IDS_ADMIN = []
+    for role_id in settings['ROLE_ADMIN'].split(','):
+        try:
+            ROLE_IDS_ADMIN.append(int(role_id.strip()))
+        except ValueError:
+            pass
+
     is_admin = ctx.author.guild_permissions.administrator
+    is_owner = str(ctx.author.id) in admin_users
     has_role = any(
         role.id in ROLE_IDS_ADMIN or role.id in ROLE_IDS_MODERATOR 
         for role in ctx.author.roles)
-    if not has_role and not is_admin:  
+    if not has_role and not is_admin and not is_owner:  
         await ctx.send(embed=create_embed(
-            "",
+            "Ошибка при попытке использовать команду",
             f"{base['ICON_PERMISSION']} Недостаточно прав или Ваши права были заморожены!",
             color=chosen_color),
             ephemeral=True)
@@ -63,17 +79,16 @@ base = load_base()
 class take(commands.Cog):
     def __init__(self, bot):  
         self.bot = bot
-        print('Файл Commands/Economy/take.py Загружен!')
 
  
-    @bot.slash_command(name='take', description='Убавить указанную сумму от основного баланса (🎓)')
+    @bot.slash_command(name='take', description='Убавить указанную сумму от основного баланса.')
     async def take(self, ctx, user: disnake.Member = None, amount: int = None):
         guild_id = ctx.guild.id
         settings = load_config(guild_id)
         chosen_color = get_color_from_config(settings)
         if not await check_permissions(guild_id, ctx):
             return
-
+        
         if user is None:
             user = ctx.author
 
@@ -82,8 +97,8 @@ class take(commands.Cog):
 
         if amount < 1:
             await ctx.send(embed=create_embed(
-                "",
-                f"{base['ICON_PERMISSION']} Укажите сумму не меньше 1",
+                "Ошибка при попытке использовать команду",
+                f"{base['ICON_PERMISSION']} Укажите сумму не меньше 1.",
                 color=chosen_color),
                            ephemeral=True)
             return
@@ -92,7 +107,7 @@ class take(commands.Cog):
             amount = int(amount)  
         except ValueError:
             await ctx.send(embed=create_embed(
-                "",
+                "Ошибка при попытке использовать команду",
                 f"{base['ICON_PERMISSION']} Укажите сумму числом.",
                 color=chosen_color),
                            ephemeral=True)
@@ -164,9 +179,7 @@ class take(commands.Cog):
 
         CHANNEL_CANAl_ID = settings.get('ADMIN_LOGS', [])
 
-        admin_channel = ctx.guild.get_channel(int(CHANNEL_CANAl_ID))
-
-        if admin_channel is None:
-            return
-
-        message = await admin_channel.send(embed=log_embed)       
+        if CHANNEL_CANAl_ID:  
+            admin_channel = ctx.guild.get_channel(int(CHANNEL_CANAl_ID[0]))
+            if admin_channel is not None:
+                await admin_channel.send(embed=log_embed)

@@ -7,7 +7,7 @@ from disnake.ext import commands
 bot = commands.InteractionBot(intents=disnake.Intents.all())
 
 def load_base():
-    config_path = os.path.join('utils/cache/configs', f'main.json')
+    config_path = os.path.join('utils/global', f'main.json')
     if os.path.exists(config_path):
         with open(config_path, 'r') as config_file:
             return json.load(config_file)
@@ -29,28 +29,28 @@ def create_embed(title, description, color):
     return embed
 
 def get_color_from_config(settings):
-    color_choice = settings.get('COLOR', 'orange')
+    color_choice = settings.get('COLOR', 'default')
     return colors.get(color_choice.lower(), disnake.Color.orange())
+
+def load_admin_users():
+    try:
+        with open('utils/global/admin_users.json', 'r', encoding='utf-8') as f:
+            admin_users = json.load(f)
+            return admin_users
+    except FileNotFoundError:
+        return {}
 
 async def check_permissions(guild_id, ctx):
     settings = load_config(guild_id)
     chosen_color = get_color_from_config(settings)
 
-    def get_role_ids(role_key):
-        return [
-            int(role_id) for role_id in settings.get(role_key, [])
-            if isinstance(role_id, (str, int)) and str(role_id).strip()
-        ]
-    
-    ROLE_IDS_MODERATOR = get_role_ids('ROLE_MODER')
-    ROLE_IDS_ADMIN = get_role_ids('ROLE_ADMIN')
+    admin_users = load_admin_users()
+
     is_admin = ctx.author.guild_permissions.administrator
-    has_role = any(
-        role.id in ROLE_IDS_ADMIN or role.id in ROLE_IDS_MODERATOR 
-        for role in ctx.author.roles)
-    if not has_role and not is_admin:  
+    is_owner = str(ctx.author.id) in admin_users
+    if not is_admin and not is_owner:  
         await ctx.send(embed=create_embed(
-            "",
+            "Ошибка при попытке использовать команду",
             f"{base['ICON_PERMISSION']} Недостаточно прав или Ваши права были заморожены!",
             color=chosen_color),
             ephemeral=True)
@@ -62,17 +62,45 @@ base = load_base()
 class set_moderator(commands.Cog):
     def __init__(self, bot):  
         self.bot = bot
-        print('Файл Commands/Config/set_moderator.py Загружен!')
 
-    @bot.slash_command(name="set_moderator", description="Изменить ID ролей (Модератор) (💻)")
-    async def set_moderator_id(ctx, new_role: disnake.Role):
+    @bot.slash_command(name="set_moderator", description="Изменить ID ролей (Модератор)")
+    async def set_moderator_id(ctx, new_role: disnake.Role = None, delete: bool = False):
         guild_id = ctx.guild.id
         if not await check_permissions(guild_id, ctx):
             return
-
+        
         guild_id = ctx.guild.id
         config_data = load_config(guild_id)
         chosen_color = get_color_from_config(config_data)
+        
+        if delete:
+            if 'ROLE_MODER' in config_data:
+                config_data['ROLE_MODER'] = "" 
+                with open(os.path.join('utils/cache/configs', f'{guild_id}.json'), 'w') as config_file:
+                    json.dump(config_data, config_file, indent=4)
+                
+                embed = disnake.Embed(
+                    title="Действие выполнено",
+                    description=f"{base['APPROVED']} Значени mod-role успешно отключёно.",
+                    color=chosen_color
+                )
+                await ctx.send(embed=embed, ephemeral=True)
+            else:
+                embed = disnake.Embed(
+                    title="Ошибка при попытке использовать команду",
+                    description=f"{base['ICON_PERMISSION']} Значение mod-role не было установлено.",
+                    color=disnake.Color.red()
+                )
+                await ctx.send(embed=embed, ephemeral=True)
+            return
+
+        if new_role is None:
+            embed = create_embed(
+                "Ошибка при попытке использовать команду",
+                f"{base['ICON_PERMISSION']} Вы не указали все необходимые для команды аргументы.",
+                color=chosen_color)
+            await ctx.send(embed=embed, ephemeral=True)
+            return
 
         if config_data is not None:
             config_data['ROLE_MODER'] = str(new_role.id)
@@ -80,5 +108,5 @@ class set_moderator(commands.Cog):
                       'w') as config_file:
                 json.dump(config_data, config_file, indent=4)
 
-        embed = create_embed("", f"{base['APPROVED']} ID ролей успешно изменен на {new_role.mention}.", color=chosen_color)
+        embed = create_embed("Действие выполнено", f"{base['APPROVED']} ID ролей успешно изменен на {new_role.mention}.", color=chosen_color)
         await ctx.send(embed=embed, ephemeral=True)

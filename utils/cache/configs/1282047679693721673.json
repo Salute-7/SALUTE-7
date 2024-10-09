@@ -1,11 +1,10 @@
 {
-    "ROLE_MODER": "1282048818543722607",
-    "ROLE_ADMIN": "1282050588435157114",
-    "PAY_LOGS": "",
-    "ADMIN_LOGS": "",
-    "ROLE_ID": "1282048818543722607",
     "GLOBAL": "",
-    "COLOR": "cyan",
-    "WELCOME_ENABLED": "True",
-    "WELCOME_CHANNEL": ""
+    "ROLE_MODER": "",
+    "ROLE_ADMIN": "",
+    "ADMIN_LOGS": "",
+    "ROLE_ID": "",
+    "COLOR": "default",
+    "WELCOME_CHANNEL": "",
+    "WEBHOOK": ""
 }

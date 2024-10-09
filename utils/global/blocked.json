@@ -1,0 +1,9 @@
+{
+    "blocked_users": [
+        {
+            "id": "123",
+            "reason": null
+        }
+    ],
+    "blocked_guilds": []
+}

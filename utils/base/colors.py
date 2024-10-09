@@ -23,5 +23,5 @@ colors = {
     "gold": disnake.Color.from_rgb(255, 215, 0),
     "salmon": disnake.Color.from_rgb(250, 128, 114),
     "orchid": disnake.Color.from_rgb(218, 112, 214),
-    "black": disnake.Color.from_rgb(0, 0, 0),
+    "default": disnake.Color.from_rgb(168,166,240),
 }

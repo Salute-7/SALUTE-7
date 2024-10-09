@@ -10,7 +10,7 @@ from disnake.ext import commands
 bot = commands.InteractionBot(intents=disnake.Intents.all())
 
 def load_base():
-    config_path = os.path.join('utils/cache/configs', f'main.json')
+    config_path = os.path.join('utils/global', f'main.json')
     if os.path.exists(config_path):
         with open(config_path, 'r') as config_file:
             return json.load(config_file)
@@ -32,14 +32,14 @@ def create_embed(title, description, color):
     return embed
 
 def get_color_from_config(settings):
-    color_choice = settings.get('COLOR', 'orange')
+    color_choice = settings.get('COLOR', 'default')
     return colors.get(color_choice.lower(), disnake.Color.orange())
 
 base = load_base()
 
 class DuelView(disnake.ui.View):
     active_duels = set() 
-    duel_timeout = 120 
+    duel_timeout = 60
 
     def __init__(self, target, author, amount, ctx):
         super().__init__()  
@@ -86,7 +86,7 @@ class DuelView(disnake.ui.View):
             title=
             f"Дуэль {self.author.display_name} и {self.target.display_name} отменена!",
             description=
-            f"\n \n \n{self.target.mention} **отклонил вызов.\n Используйте `/duel`, чтобы отправь новый запрос.**",
+            f"\n \n \n{self.target.mention} **отклонил вызов.\n Используйте </duel:1283133506297266342>, чтобы отправь новый запрос.**",
             color=chosen_color)
 
         embed.set_thumbnail(url=self.target.display_avatar.url)
@@ -101,14 +101,15 @@ class DuelView(disnake.ui.View):
         chosen_color = get_color_from_config(settings)
         if interaction.user != self.target:
             embed = disnake.Embed(
-                title="",
+                title="Ошибка при попытке использовать команду",
                 description=
                 f"{base['ICON_PERMISSION']} У вас нет доступа к этой кнопке!",
                 color=chosen_color)
 
-            await interaction.response.send_message(embed=embed,
-                                                    ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
+
+        formatted = f"{self.amount:,}".replace(',', '.')
 
         if interaction.user == self.target and not self.accepted:
             self.accepted = True
@@ -124,13 +125,14 @@ class DuelView(disnake.ui.View):
                 title=
                 f"Результат дуэли {self.author.display_name} и {self.target.display_name}!",
                 description=
-                f"\n **Победитель: {winner.mention}!**\n\n:coin: Ставка:\n```+{self.amount}₽```",
+                f"\n **Победитель: {winner.mention}!**\n\n**:coin: Ставка:**\n```+{formatted}₽```",
                 color=chosen_color)
             embed.set_thumbnail(url=winner.display_avatar.url)
             await interaction.message.edit(embed=embed)
 
-            connection = sqlite3.connect(f'database/{interaction.guild.id}.db')
+            connection = sqlite3.connect(f'utils/cache/database/{guild_id}.db')
             cursor = connection.cursor()
+
             if winner == self.author:
                 cursor.execute("UPDATE users SET cash = cash + ? WHERE id = ?",
                                (self.amount, self.author.id))
@@ -156,7 +158,7 @@ class DuelView(disnake.ui.View):
         chosen_color = get_color_from_config(settings)
         if interaction.user != self.target and interaction.user != self.author:
             embed = disnake.Embed(
-                title="",
+                title="Ошибка при попытке использовать команду",
                 description=
                 f"{base['ICON_PERMISSION']} У вас нет доступа к этой кнопке!",
                 color=chosen_color)
@@ -183,24 +185,33 @@ class DuelView(disnake.ui.View):
 class duel(commands.Cog):
     def __init__(self, bot):  
         self.bot = bot
-        print('Файл Commands/Game/duel.py Загружен!')
 
-    @commands.slash_command(name="duel", description="Вызов на дуэль (🌎)")
+    @commands.slash_command(name="duel", description="Вызов на дуэль.")
     async def duel(self, ctx, target: disnake.Member, amount: int):
 
         user = ctx.author
         guild_id = ctx.guild.id
         settings = load_config(guild_id)
-        connection = sqlite3.connect(f'database/{guild_id}.db')
+        connection = sqlite3.connect(f'utils/cache/database/{guild_id}.db')
         cursor = connection.cursor()
         chosen_color = get_color_from_config(settings)
+
+        global_channel_id = settings.get("GLOBAL", None)
+        if global_channel_id and int(global_channel_id) == ctx.channel.id:
+            embed = create_embed(
+                "Ошибка при попытке использовать команду",
+                f"{base['ICON_PERMISSION']}  Команду нельзя использовать в канале глобального чата.",
+                color=chosen_color
+            )
+            await ctx.response.send_message(embed=embed, ephemeral=True)
+            return 
 
         cursor.execute("SELECT cash FROM users WHERE id = ?",
                        (ctx.author.id, ))
         author_cash = cursor.fetchone()[0]
         if author_cash < amount:
             embed = disnake.Embed(
-                title="",
+                title="Ошибка при попытке использовать команду",
                 description=
                 f"{base['ICON_PERMISSION']} У вас недостаточно средств для ставки.",
                 color=chosen_color)
@@ -210,7 +221,7 @@ class duel(commands.Cog):
 
         if amount < 50000:
             embed = disnake.Embed(
-                title="",
+                title="Ошибка при попытке использовать команду",
                 description=
                 f"{base['ICON_PERMISSION']} Минимальная ставка 50.000₽",
                 color=chosen_color)
@@ -219,7 +230,7 @@ class duel(commands.Cog):
 
         if target == ctx.author:
             embed = disnake.Embed(
-                title="",
+                title="Ошибка при попытке использовать команду",
                 description=
                 f"{base['ICON_PERMISSION']} Вы не можете отправить дуэль самому себе.",
                 color=chosen_color)
@@ -230,7 +241,7 @@ class duel(commands.Cog):
         target_cash = cursor.fetchone()[0]
         if target_cash < amount:
             embed = disnake.Embed(
-                title="",
+                title="Ошибка при попытке использовать команду",
                 description=
                 f"{base['ICON_PERMISSION']} У {target.display_name} недостаточно средств для ставки.",
                 color=chosen_color)

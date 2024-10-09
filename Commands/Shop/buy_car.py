@@ -3,6 +3,7 @@ import json
 import sqlite3
 import disnake
 import datetime
+import asyncio
 from utils.base.selected_car import cars
 from utils.base.colors import colors
 from disnake.ext import commands
@@ -10,7 +11,7 @@ from disnake.ext import commands
 bot = commands.InteractionBot(intents=disnake.Intents.all())
 
 def load_base():
-    config_path = os.path.join('utils/cache/configs', f'main.json')
+    config_path = os.path.join('utils/global', f'main.json')
     if os.path.exists(config_path):
         with open(config_path, 'r') as config_file:
             return json.load(config_file)
@@ -32,7 +33,7 @@ def create_embed(title, description, color):
     return embed
 
 def get_color_from_config(settings):
-    color_choice = settings.get('COLOR', 'orange')
+    color_choice = settings.get('COLOR', 'default')
     return colors.get(color_choice.lower(), disnake.Color.orange())
 
 base = load_base()
@@ -40,15 +41,25 @@ base = load_base()
 class buy_car(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        print('Файл Commands/Shop/buy_car.py Загружен!')
 
-    @commands.slash_command(name='buy_car', description='Покупка автомобиля. (🌎)')
+    @commands.slash_command(name='buy_car', description='Покупка автомобиля.')
     async def buy_car(self, inter: disnake.AppCmdInter):
-        await inter.response.defer()  # Отложенный ответ
 
         guild_id = inter.guild.id
         settings = load_config(guild_id)
         chosen_color = get_color_from_config(settings)
+
+        await inter.response.defer()
+
+        global_channel_id = settings.get("GLOBAL", None)
+        if global_channel_id and int(global_channel_id) == inter.channel.id:
+            embed = create_embed(
+                "Ошибка при попытке использовать команду",
+                f"{base['ICON_PERMISSION']}  Команду нельзя использовать в канале глобального чата.",
+                color=chosen_color
+            )
+            await inter.response.send_message(embed=embed, ephemeral=True)
+            return 
 
         options = [
             disnake.SelectOption(label=car['name'], value=str(index))
@@ -59,13 +70,19 @@ class buy_car(commands.Cog):
 
         async def select_callback(interaction: disnake.Interaction):
             nonlocal select  
-
-            # Получение выбранного автомобиля
+            author_id = interaction.author.id
+            if interaction.author.id != author_id:
+                embed = disnake.Embed(
+                title=f"Ошибка при попытке использовать команду",
+                description=f'Вы не можете выбрать раздел, так как не являетесь владельцем.',
+                color=chosen_color
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
             selected_car = cars[int(select.values[0])]
 
             formatted_car = f"{selected_car['price']:,}₽".replace(',', '.')
 
-            # Проверка баланса
             with sqlite3.connect(f'utils/cache/database/{inter.guild_id}.db') as connection:
                 cursor = connection.cursor()
                 cursor.execute("SELECT cash FROM users WHERE id = ?", (interaction.user.id,))
@@ -94,7 +111,7 @@ class buy_car(commands.Cog):
             if user_cash < selected_car['price']:
                 embed = disnake.Embed(
                     title=f"{selected_car['name']}",
-                    description=f'У вас недостаточно средств для покупки {selected_car["name"]}.',
+                    description = f"{base['ICON_PERMISSION']} У вас недостаточно средств для покупки {selected_car['name']}.",
                     color=chosen_color
                 )
                 embed.set_footer(text=f'Стоимость: {formatted_car}') 
@@ -105,7 +122,6 @@ class buy_car(commands.Cog):
                 await interaction.response.edit_message(embed=embed, view=view)
                 return
 
-            # Подтверждение покупки
             embed = create_embed(
                 '',
                 f'{selected_car["description"]}',
@@ -117,7 +133,6 @@ class buy_car(commands.Cog):
             view = disnake.ui.View()
             view.add_item(buy_button)
 
-            # Передаем view и buy_button в функцию обратного вызова
             buy_button.callback = lambda interaction: buy_button_callback(interaction, view, buy_button) 
     
 
@@ -128,13 +143,13 @@ class buy_car(commands.Cog):
 
                 if interaction.user != inter.user: 
                     embed = disnake.Embed(
-                    title=f"",
-                    description=f'Ты не можешь купить эту машину!.',
+                    title=f"Ошибка при попытке использовать команду",
+                    description=f'{base["ICON_PERMISSION"]} Ты не можешь купить эту машину!.',
                     color=chosen_color
                     )
                     embed.set_footer(text=f'Стоимость: {formatted_car}') 
                     embed.set_image(url=selected_car['image'])
-                    await interaction.response.send_message(embed=embed)
+                    await interaction.edit_original_response(embed=embed)
                     return
 
 
@@ -156,7 +171,6 @@ class buy_car(commands.Cog):
                     await interaction.response.edit_message(embed=embed, view=view)
                     return
 
-                # Обработка покупки
                 with sqlite3.connect(f'utils/cache/database/{inter.guild_id}.db') as connection:
                     cursor = connection.cursor()
                     cursor.execute("UPDATE users SET cash = cash - ? WHERE id = ?", (selected_car['price'], interaction.user.id))
@@ -166,7 +180,6 @@ class buy_car(commands.Cog):
                     )
                     connection.commit()
 
-                # Вывод подтверждения покупки
                 embed = disnake.Embed(
                     title="Поздравляем!",
                     description=f"Вы успешно купили {selected_car['name']} за {formatted_car}!",
@@ -175,10 +188,8 @@ class buy_car(commands.Cog):
                 embed.set_footer(text=f'Стоимость: {formatted_car}') 
                 embed.set_image(url=selected_car['image'])
                 select.disabled = False  
-                # Удаляем кнопку "Купить"
                 view.remove_item(buy_button)
 
-                # Обновляем сообщение
                 await interaction.response.edit_message(embed=embed, view=view) 
 
             buy_button.callback = buy_button_callback
@@ -186,9 +197,7 @@ class buy_car(commands.Cog):
             view.add_item(buy_button)
             view.add_item(select)
 
-            # Отправляем сообщение с кнопкой и селектом
             await interaction.response.edit_message(embed=embed, view=view)
-
         select.callback = select_callback
         view = disnake.ui.View()
         view.add_item(select)
@@ -205,3 +214,6 @@ class buy_car(commands.Cog):
                             "Привод: Полный К/П: Авто", color=chosen_color)
         embed.set_image(url='https://avatars.mds.yandex.net/get-autoru-vos/5238237/e9a5f74c0dc83b0187566312601bf258/1200x900')
         await inter.edit_original_message(embed=embed, view=view)
+
+        await asyncio.sleep(120)
+        await inter.edit_original_message(embed=embed, view=None)

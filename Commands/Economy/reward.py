@@ -12,7 +12,7 @@ from disnake.ext import commands
 bot = commands.InteractionBot(intents=disnake.Intents.all())
 
 def load_base():
-    config_path = os.path.join('utils/cache/configs', f'main.json')
+    config_path = os.path.join('utils/global', f'main.json')
     if os.path.exists(config_path):
         with open(config_path, 'r') as config_file:
             return json.load(config_file)
@@ -34,41 +34,34 @@ def create_embed(title, description, color):
     return embed
 
 def get_color_from_config(settings):
-    color_choice = settings.get('COLOR', 'orange')
+    color_choice = settings.get('COLOR', 'default')
     return colors.get(color_choice.lower(), disnake.Color.orange())
 
 base = load_base()
 
-user_data = {}
-
 class User:
     def __init__(self):
-        self.last_reward_time = None  # Время последнего получения награды
-        self.balance = 0  # Баланс пользователя
+        self.balance = 0
+        self.last_reward_time = None
 
     def can_receive_reward(self):
         if self.last_reward_time is None:
             return True
-        return datetime.now() - self.last_reward_time >= timedelta(seconds=1)
+        return datetime.now() - self.last_reward_time >= timedelta(hours=1)
 
     def receive_reward(self, job):
         if self.can_receive_reward():
-            if job == "таксистом":
-                reward_amount = random.randint(10000, 99000)
-            elif job == "пилотом":
-                reward_amount = random.randint(200000, 350000)
-            elif job == "курьером":
-                reward_amount = random.randint(20000, 75000)
-            elif job == "учёным":
-                reward_amount = random.randint(450000, 950000)
-            elif job == "капитаном судна":
-                reward_amount = random.randint(120000, 450000)
-            elif job == "на нефтебазе":
-                reward_amount = random.randint(175000, 350000)
-            elif job == "дальнобойщиком":
-                reward_amount = random.randint(150000, 300000)
-            elif job == "автомехаником":
-                reward_amount = random.randint(80000, 170000)
+            rewards = {
+                "таксистом": (10000, 99000),
+                "пилотом": (200000, 350000),
+                "курьером": (20000, 75000),
+                "учёным": (450000, 950000),
+                "капитаном судна": (120000, 450000),
+                "на нефтебазе": (175000, 350000),
+                "дальнобойщиком": (150000, 300000),
+                "автомехаником": (80000, 170000)
+            }
+            reward_amount = random.randint(*rewards[job])
             self.balance += reward_amount
             self.last_reward_time = datetime.now()
             return reward_amount
@@ -76,66 +69,121 @@ class User:
             return None
 
     def receive_penalty(self, job):
-        if job == "таксистом":
-            penalty = random.randint(3000, 8000)
-        elif job == "пилотом":
-            penalty = random.randint(10000, 45000)
-        elif job == "курьером":
-            penalty = random.randint(2000, 7000)
-        elif job == "учёным":
-            penalty = random.randint(100000, 250000)
-        elif job == "капитаном судна":
-            penalty = random.randint(50000, 100000)
-        elif job == "на нефтебазе":
-            penalty = random.randint(40000, 80000)
-        elif job == "дальнобойщиком":
-            penalty = random.randint(10000, 45000)
-        elif job == "автомехаником":
-            penalty = random.randint(8000, 34000)       
+        penalties = {
+            "таксистом": (3000, 8000),
+            "пилотом": (10000, 45000),
+            "курьером": (2000, 7000),
+            "учёным": (100000, 250000),
+            "капитаном судна": (50000, 100000),
+            "на нефтебазе": (40000, 80000),
+            "дальнобойщиком": (10000, 45000),
+            "автомехаником": (8000, 34000)
+        }
+        penalty = random.randint(*penalties[job])
         if self.balance >= penalty:
             self.balance -= penalty
             return penalty
         else:
-            return 0  # Если недостаточно средств, штраф не применяется
-
+            return None
 
 class reward(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.user_data = {}
-        print('Файл Commands/Economy/reward.py Загружен!')
 
-    @commands.slash_command(name="reward", description="Получить зарплату за работу раз в час. (🌎)")
+    @commands.slash_command(name="reward", description="Получить зарплату за работу раз в час.")
     async def reward(self, interaction: disnake.ApplicationCommandInteraction):
         user_id = interaction.user.id
         guild_id = interaction.guild.id
-        settings = load_config(guild_id)  # Предполагается, что эта функция определена где-то в вашем коде
+        settings = load_config(guild_id) 
         connection = sqlite3.connect(f'utils/cache/database/{guild_id}.db')
         cursor = connection.cursor()
-        chosen_color = get_color_from_config(settings)  # Функция для выбора цвета из конфигурации
+        chosen_color = get_color_from_config(settings) 
+
+        global_channel_id = settings.get("GLOBAL", None)
+        if global_channel_id and int(global_channel_id) == interaction.channel.id:
+            embed = create_embed(
+                "Ошибка при попытке использовать команду",
+                f"{base['ICON_PERMISSION']} Команду нельзя использовать в канале глобального чата.",
+                color=chosen_color
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return 
 
         if user_id not in self.user_data:
             self.user_data[user_id] = User()
 
         user = self.user_data[user_id]
 
-        # Случайный выбор работы
-        kosyak = random.choice(["превышаете свои полномочия.", "забываете отметиться в журнале.", "выходите на работу c опозданием.", "выходите на работу пьяным.", "теряете несколько купюр.", "засыпаете на рабочем месте.", "конфликтуете с начальником."])
-        job = random.choice(["таксистом", "пилотом", "курьером", "учёным", "капитаном судна", "на нефтебазе", "дальнобойщиком", "автомехаником"])
-        reward_amount = user.receive_reward(job)
-        penalty = user.receive_penalty(job)
+        num1 = random.randint(1, 10)
+        num2 = random.randint(1, 10)
+        operation = random.choice(['+', '-', '*'])
 
-        itog = (reward_amount - penalty) if reward_amount is not None else 0
+        if operation == '+':
+            correct_answer = num1 + num2
+        elif operation == '-':
+            correct_answer = num1 - num2
+        else:
+            correct_answer = num1 * num2
 
-        formatted_reward_amount = f"{itog:,}".replace(',', '.')
-        formatted_reward = f"{reward_amount:,}".replace(',', '.') if reward_amount is not None else "Не удалось получить награду"
-        formatted_penalty = f"{penalty:,}".replace(',', '.')
+        example = f"{num1} {operation} {num2}"
 
-        next_reward_time = user.last_reward_time + timedelta(seconds=1)# Добавляем 1 час
-        formatted_next_reward_time = next_reward_time.strftime("%H:%M:%S") # Форматируем время
+        answer_input = disnake.ui.TextInput(label="Ваш ответ:", placeholder="Введите ваш ответ", required=True, custom_id="answer_input")
+        
+        modal = disnake.ui.Modal(title=f"Решите пример: {example}", components=[answer_input], timeout=60)
 
-        if reward_amount is not None:
+        await interaction.response.send_modal(modal)
+
+        def check(m):
+            return m.author.id == user_id and m.channel == interaction.channel
+
+        try:
+            modal_response = await self.bot.wait_for('modal_submit', check=check, timeout=60.0)
+
+            user_answer_str = modal_response.text_values.get("answer_input")
+            
+            if user_answer_str is None:
+                embed = disnake.Embed(
+                    title="Ошибка при попытке использовать команду",
+                    description=f"{base['ICON_PERMISSION']} Вы не ввели ответ или задача была решена неправильно.",
+                    color=chosen_color  
+                )                
+                await interaction.send(embed=embed, ephemeral=True)
+                return
+
             try:
+                user_answer = int(user_answer_str)
+            except ValueError:
+                await interaction.send("Пожалуйста, введите корректный числовой ответ.", ephemeral=True)
+                return
+
+            if user_answer == correct_answer:
+                kosyak = random.choice(["превышаете свои полномочия.", "забываете отметиться в журнале.", "выходите на работу с опозданием.", "выходите на работу пьяным.", "теряете несколько купюр.", "засыпаете на рабочем месте.", "конфликтуете с начальником."])
+                job = random.choice(["таксистом", "пилотом", "курьером", "учёным", "капитаном судна", "на нефтебазе", "дальнобойщиком", "автомехаником"])
+            else:
+                embed = disnake.Embed(
+                    title="Ошибка при попытке использовать команду",
+                    description=f"Вы не решили задачу или задача была решена неправильно.",
+                    color=chosen_color  
+                )
+                await modal_response.send(embed=embed, ephemeral=True)
+            if user.can_receive_reward():
+                reward_amount = user.receive_reward(job)
+                penalty = user.receive_penalty(job)
+
+                formatted_reward_amount = f"{reward_amount:,}".replace(',', '.') if reward_amount is not None else "0"
+
+                formatted_penalty = f"{penalty:,}".replace(',', '.') if penalty is not None else "0"
+
+                cursor.execute("SELECT cash FROM users WHERE id = ?", (user_id,))
+                balance_info = cursor.fetchone()
+                
+                if balance_info is not None:
+                    balance = balance_info[0]
+                    formatted_balance = f"{balance:,}".replace(',', '.')
+                else:
+                    formatted_balance = "0"
+
                 cursor.execute("UPDATE users SET cash = cash + ? WHERE id = ?", (reward_amount, user_id))
                 connection.commit()
 
@@ -148,8 +196,14 @@ class reward(commands.Cog):
                 else:
                     formatted_balance = "Информация отсутствует"
 
+                if user.last_reward_time is not None:
+                    next_reward_time = user.last_reward_time + timedelta(hours=1)
+                    formatted_next_reward_time = next_reward_time.strftime("%H:%M:%S")
+                else:
+                    formatted_next_reward_time = "Неизвестно"
+
                 embed = disnake.Embed(
-                    title=f"",
+                    title="Работа завершена",
                     description=(
                         f"Вы работаете {job}, но {kosyak}\n"
                         f"В следующий раз вы сможете выйти на работу в {formatted_next_reward_time}."
@@ -159,44 +213,44 @@ class reward(commands.Cog):
                 embed.add_field(name="Получено:", value=f"```{formatted_reward_amount}₽```", inline=True)
                 embed.add_field(name="Утеряно:", value=f"```{formatted_penalty}₽```", inline=True)                
                 embed.add_field(name="Итог:", value=f"```{formatted_balance}₽```", inline=True)
-                # Установка изображения в зависимости от работы
-                if job == "таксистом":
-                    car_image_url = 'https://avatars.dzeninfra.ru/get-zen_doc/168279/pub_5cef7a2ae927bd00ae01a529_5cef8b9c1cd66200af7a458f/scale_1200'
-                    embed.set_image(url=car_image_url)
-                elif job == "пилотом":
-                    plane_image_url = 'https://i.pinimg.com/originals/53/52/57/535257b9fe97c87c077751a38704ba0e.jpg'  
-                    embed.set_image(url=plane_image_url)
-                elif job == "курьером":
-                    plane_image_url = 'https://s0.rbk.ru/v6_top_pics/media/img/2/39/347129397912392.webp' 
-                    embed.set_image(url=plane_image_url)
-                elif job == "учёным":
-                    plane_image_url = 'https://nenadzor.ru/img/news/kabelnaya-prohodka-v-atomnoj-otrasli-2.jpg'  
-                    embed.set_image(url=plane_image_url)
-                elif job == "капитаном судна":
-                    plane_image_url = 'https://i.pinimg.com/originals/ef/42/7c/ef427cec68961663c7d7a9c2e061919f.jpg'  
-                    embed.set_image(url=plane_image_url)
-                elif job == "на нефтебазе":
-                    plane_image_url = 'https://www.marsalis.ee/wp-content/uploads/2016/10/metall_bg.jpg'  
-                    embed.set_image(url=plane_image_url)
-                elif job == "дальнобойщиком":
-                    plane_image_url = 'https://akvilon-leasing.ru/upload/iblock/3ba/3baffda321df6080c033aec98121d6f6.jpg'
-                    embed.set_image(url=plane_image_url)
-                elif job == "автомехаником":
-                    plane_image_url = 'https://avatars.mds.yandex.net/get-altay/4442047/2a00000178ad80465c98b781717df018f30b/orig' 
-                    embed.set_image(url=plane_image_url)
-                await interaction.send(embed=embed)
 
-            except sqlite3.Error as e:
-                await interaction.send("Произошла ошибка при обновлении базы данных.")
-                print(f"Database error: {e}")
+                job_images = {
+                    "таксистом": 'https://avatars.dzeninfra.ru/get-zen_doc/168279/pub_5cef7a2ae927bd00ae01a529_5cef8b9c1cd66200af7a458f/scale_1200',
+                    "пилотом": 'https://i.pinimg.com/originals/53/52/57/535257b9fe97c87c077751a38704ba0e.jpg',
+                    "курьером": 'https://s0.rbk.ru/v6_top_pics/media/img/2/39/347129397912392.webp',
+                    "учёным": 'https://nenadzor.ru/img/news/kabelnaya-prohodka-v-atomnoj-otrasli-2.jpg',
+                    "капитаном судна": 'https://i.pinimg.com/originals/ef/42/7c/ef427cec68961663c7d7a9c2e061919f.jpg',
+                    "на нефтебазе": 'https://www.marsalis.ee/wp-content/uploads/2016/10/metall_bg.jpg',
+                    "дальнобойщиком": 'https://akvilon-leasing.ru/upload/iblock/3ba/3baffda321df6080c033aec98121d6f6.jpg',
+                    "автомехаником": 'https://avatars.mds.yandex.net/get-altay/4442047/2a00000178ad80465c98b781717df018f30b/orig'
+                }
 
-        else:    
+                if job in job_images:
+                    embed.set_image(url=job_images[job])
+
+                await modal_response.send(embed=embed) 
+            else:
+                if user.last_reward_time is not None:
+                    next_reward_time = user.last_reward_time + timedelta(hours=1)
+                    formatted_next_reward_time = next_reward_time.strftime("%H:%M:%S")
+                else:
+                    formatted_next_reward_time = "Неизвестно"
+                embed = disnake.Embed(
+                    title="Зарплата уже получена!",
+                    description=f"Вы уже получали зарплату. Попробуйте снова в {formatted_next_reward_time}.",
+                    color=chosen_color  
+                )
+                await modal_response.send(embed=embed, ephemeral=True)
+                return
+
+        except asyncio.TimeoutError:
+            modal_response = None  
             embed = disnake.Embed(
-                title="Зарплата уже получена!",
-                description=f"Вы уже получали зарплату. Попробуйте снова в `{formatted_next_reward_time}.`",
-                color=chosen_color)
-            await interaction.send(embed=embed, ephemeral=True)
-            return
-
-        connection.close()
- 
+                title="Ошибка при попытке использовать команду",
+                description=f"{base['ICON_PERMISSION']} Время на решение примера истекло.",
+                color=chosen_color  
+            )
+            await modal_response.send(embed=embed, ephemeral=True)
+        
+        except Exception as e:
+            pass
